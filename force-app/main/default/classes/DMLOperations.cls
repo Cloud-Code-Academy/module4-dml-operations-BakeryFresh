@@ -17,7 +17,7 @@
  * The methods within this class serve as practical examples of different DML operations,
  * allowing developers to learn through practice and examples.
  *
- * @author Your Name
+ * @author Shaman McLean
  */
 
 
@@ -31,13 +31,14 @@ public with sharing class DMLOperations {
      */
     public static Id insertNewAccount() {
         // Create a new Account instance
+        Account acc = new Account(Name = 'Example', Website = 'website.com');
 
         // Set some fields on the Account
 
         // Insert the Account into the database
-
+        insert acc;
         // Return the Id of the newly created Account
-        return null;
+        return acc.id;
     }
 
     /**
@@ -48,8 +49,9 @@ public with sharing class DMLOperations {
      */
     public static void createAccount(String name, String industry) {
         // Create a new Account and set the fields inline
-
+        Account acc = new Account(Name = name, Industry = industry);
         // Insert the Account
+        insert acc;
     }
 
     
@@ -61,14 +63,15 @@ public with sharing class DMLOperations {
      */
     public static Id insertNewContact(Id accountId) {
         // Create a new Contact instance
+        Contact cont = new Contact(FirstName = 'John', LastName = 'Smith', accountId = accountId);
 
         // Set some fields on the Contact
         // Set the AccountId field to the given accountId
 
         // Insert the Contact into the database
-
+        insert cont;
         // Return the Id of the newly created Contact
-        return null;
+        return cont.id;
     }
 
     /**
@@ -80,11 +83,13 @@ public with sharing class DMLOperations {
      */
     public static void updateContactLastName(Id contactId, String newLastName) {
         // Retrieve the Contact from the database
-        // [SELECT Id FROM Contact WHERE Id = :contactId]
+        Contact cont = [SELECT Id FROM Contact WHERE Id = :contactId];
 
         // Update the Contact's last name
+        cont.LastName = newLastName;
 
         // Update the Contact in the database
+        update cont;
     }
 
     /**
@@ -96,11 +101,13 @@ public with sharing class DMLOperations {
      */
     public static void updateOpportunityStage(Id oppId, String newStage) {
         // Retrieve the Opportunity from the database
-        // [SELECT Id FROM Opportunity WHERE Id = :oppId]
+        Opportunity opp = [SELECT Id FROM Opportunity WHERE Id = :oppId];
 
         // Update the Opportunity's stage
+        opp.stagename = 'Closed Won';
 
         // Update the Opportunity in the database
+        update opp;
     }
 
     /**
@@ -113,9 +120,12 @@ public with sharing class DMLOperations {
      */
     public static void updateAccountFields(Id accountId, String newName, String newIndustry) {
         // Query the account
-        // [SELECT Id FROM Account WHERE Id = :accountId]
+        Account acc = [SELECT Id FROM Account WHERE Id = :accountId];
 
         // Update the Account with the given Id with the new name and industry
+        acc.Name = newName;
+        acc.Industry = newIndustry;
+        update acc;
     }
 
 
@@ -129,10 +139,17 @@ public with sharing class DMLOperations {
      */
     public static void upsertOpportunityList(List<Opportunity> opportunities) {
         // Loop through each Opportunity in the list
+        for ( Opportunity opp : opportunities) {
+            opp.StageName = 'Qualification';
+            opp.CloseDate = Date.today().addMonths(3);
+            opp.Amount = 50000;
+        
             // Set the Opportunity's Stage to Qualification
             // Set the Opportunity's Close Date to 3 months from today
             // Set the Opportunity's Amount to 50000
+        }
         // Upsert the opportunities List so that records are either updated or created
+        upsert opportunities;
     }
 
     /**
@@ -145,8 +162,21 @@ public with sharing class DMLOperations {
      */
     public static void upsertOpportunities(String accountName, List<String> oppNames) {
         // Loop through each Opportunity name
-            // Create an Opportunity with the given name
+        List<Opportunity> oppList = new List<Opportunity>();
+        Account acc = [SELECT Id FROM Account WHERE Name = :accountName LIMIT 1];
+        
+        for ( String name : oppNames ){
+        // Create an Opportunity with the given name
+            Opportunity opp =  new Opportunity();    
+            opp.Name = name;
+            opp.accountId = acc.Id;
+            opp.StageName = 'Qualification';
+            opp.CloseDate = Date.today();
             // Add the Opportunity to the list
+            oppList.add(opp);
+            
+        }
+        upsert oppList;
     }
     
     /**
@@ -162,11 +192,24 @@ public with sharing class DMLOperations {
 		List<Account> accounts = [SELECT Id FROM Account WHERE Name = :accountName];
 
 		// if the Account exists, update the description
+        // otherwise, create a new Account and set the description
+        
+        if (!accounts.isEmpty()) {
+            //existing account
+            for ( Account acc : accounts ){
+                acc.Description = 'Updated Account';
+            } 
+        }    
 
-		// otherwise, create a new Account and set the description
+        if ( accounts.isEmpty() ){
+                //no existing account
+                Account acc = new Account (Name = accountName, Description = 'New Account');
+                accounts.add(acc);
+            } 
 
 		// Upsert the Account
-		return null;
+        upsert accounts;   
+        return accounts[0];
 	}
 
     /**
