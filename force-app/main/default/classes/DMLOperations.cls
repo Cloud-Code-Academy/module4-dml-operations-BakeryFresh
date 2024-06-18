@@ -162,22 +162,54 @@ public with sharing class DMLOperations {
      */
     public static void upsertOpportunities(String accountName, List<String> oppNames) {
         // Loop through each Opportunity name
+
+        //I was entirely unable to pass this question myself. 
+
         List<Opportunity> oppList = new List<Opportunity>();
-        Account acc = [SELECT Id FROM Account WHERE Name = :accountName LIMIT 1];
-        
-        for ( String name : oppNames ){
-        // Create an Opportunity with the given name
-            Opportunity opp =  new Opportunity();    
-            opp.Name = name;
-            opp.accountId = acc.Id;
-            opp.StageName = 'Qualification';
-            opp.CloseDate = Date.today();
-            // Add the Opportunity to the list
-            oppList.add(opp);
+
+        if (oppNames != null && !oppNames.isEmpty()) {
+            List<Account> accList = [SELECT Id FROM Account WHERE Name = :accountName LIMIT 1];
             
+            Account acc;
+            if (accList.isEmpty()) {
+                // new account
+                acc = new Account(Name = accountName);
+                insert acc;
+            } else {
+                acc = accList[0];
+            }
+            
+            //existing opp
+            List<Opportunity> existingOpps = [SELECT Name FROM Opportunity WHERE AccountId = :acc.Id AND Name IN :oppNames];
+            Set<String> existingOppNames = new Set<String>();
+            for (Opportunity existingOpp : existingOpps) {
+                existingOppNames.add(existingOpp.Name);
+            }
+            
+            for (String name : oppNames) {
+                // Only create a new Opportunity if it doesn't already exist
+                if (!existingOppNames.contains(name)) {
+                    Opportunity opp = new Opportunity();
+                    opp.Name = name;
+                    opp.AccountId = acc.Id;
+                    opp.StageName = 'Qualification';
+                    opp.CloseDate = Date.today();
+                    // Add the Opportunity to the list
+                    oppList.add(opp);
+                }
+            }
+            
+            if (!oppList.isEmpty()) {
+                upsert oppList;
+            }
         }
-        upsert oppList;
-    }
+        
+        
+        
+     }
+         
+        
+    
     
     /**
      * Question 9
@@ -224,14 +256,64 @@ public with sharing class DMLOperations {
 	public static void upsertAccountsWithContacts(List<Contact> contactsToUpsert) {
 		// Loop through each Contact
 
-		// Extract the Account Name from Contact's LastName
+        //i was unable to do this question myself
 
-		// Get the account based on the name or create one if it doesn't exist
-
-		// Link the Contact to its Account using the Account Id
-
-		// Upsert the Contacts
-	}
+            if (contactsToUpsert.isEmpty()) {
+                System.debug('Error: List is empty');
+                return; // Exit the method if the list is empty
+            }
+        
+            // Extract the last names from the contacts
+            Set<String> contLastNameSet = new Set<String>();
+            for (Contact cont : contactsToUpsert) {
+                contLastNameSet.add(cont.LastName);
+            }
+        
+            // Query existing Accounts with names that match the contact last names
+            List<Account> existingAccounts = [SELECT Id, Name FROM Account WHERE Name IN :contLastNameSet];
+        
+            // Map to hold the existing account names for quick lookup
+            Map<String, Account> accountMap = new Map<String, Account>();
+            for (Account acc : existingAccounts) {
+                accountMap.put(acc.Name, acc);
+            }
+        
+            // List to hold new accounts to be created
+            List<Account> accountsToInsert = new List<Account>();
+        
+            // Loop through the contact list to ensure each has a corresponding account
+            for (Contact cont : contactsToUpsert) {
+                if (!accountMap.containsKey(cont.LastName)) {
+                    // Account does not exist, create a new one
+                    Account newAcc = new Account(Name = cont.LastName);
+                    accountsToInsert.add(newAcc);
+                    accountMap.put(cont.LastName, newAcc); // Add to map to link later
+                }
+            }
+        
+            // Insert the new accounts
+            if (!accountsToInsert.isEmpty()) {
+                insert accountsToInsert;
+        
+                // Update the account map with the newly inserted accounts
+                for (Account acc : accountsToInsert) {
+                    accountMap.put(acc.Name, acc);
+                }
+            }
+        
+            // Link the contacts to the newly created or existing accounts
+            for (Contact cont : contactsToUpsert) {
+                if (accountMap.containsKey(cont.LastName)) {
+                    cont.AccountId = accountMap.get(cont.LastName).Id;
+                }
+            }
+        
+            // Upsert the contacts with the associated account IDs
+            upsert contactsToUpsert;
+        }
+        
+	
+	
 
     /**
      * Question 11
@@ -240,6 +322,19 @@ public with sharing class DMLOperations {
      */
     public static void insertAndDeleteLeads(List<String> leadNames) {
         // Loop through each Lead name
+        List<Lead> leadsToInsert = new List<Lead>();
+       
+        
+        for (String name : leadNames ) {
+            if (name != '') {
+                Lead newLead = new Lead();
+                newLead.lastname = name;
+                newLead.company = 'Example';
+                leadsToInsert.add(newLead);
+            }
+       }
+       insert leadsToInsert;
+       delete leadsToInsert;
 
         // Insert the Leads
 
@@ -255,6 +350,16 @@ public with sharing class DMLOperations {
      */
     public static void createAndDeleteCases(String accountId, Integer numOfCases) {
         // Insert the cases
+        List<Case> caseInsert = new List<Case>();
+        for (Integer i = 0; i <= numOfCases; i++){
+            Case c = new Case();
+            c.accountId = accountId;
+            c.Origin = 'Phone';
+            c.Status = 'New';
+            caseInsert.add(c);
+        }
+        insert caseInsert;
+        delete caseInsert;
 
         // Delete the cases
     }
